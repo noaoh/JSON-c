@@ -206,18 +206,19 @@ destroy(JSON_checker jc)
 }
 
 
-static int
-reject(JSON_checker jc)
+JSON_checker_result
+reject(JSON_checker jc, int next_char)
 {
 /*
     Delete the JSON_checker object.
 */
+    JSON_checker_result res = new_JSON_checker_result(FALSE, jc->pos, next_char);
     destroy(jc);
-    return FALSE;
+    return res;
 }
 
 
-static int
+int
 push(JSON_checker jc, int mode)
 {
 /*
@@ -267,13 +268,23 @@ new_JSON_checker(int depth)
     jc->state = GO;
     jc->depth = depth;
     jc->top = -1;
+    jc->pos = 0;
     jc->stack = (int*)calloc(depth, sizeof(int));
     push(jc, MODE_DONE);
     return jc;
 }
 
+JSON_checker_result
+new_JSON_checker_result(int returncode, int pos, int badchar)
+{
+    JSON_checker_result res;
+    res.returncode = returncode;
+    res.pos = pos;
+    res.badchar = badchar;
+    return res;
+}
 
-int
+JSON_checker_result
 JSON_checker_char(JSON_checker jc, int next_char)
 {
 /*
@@ -287,17 +298,23 @@ JSON_checker_char(JSON_checker jc, int next_char)
     Determine the character's class.
 */
     if (jc->valid != GOOD) {
-        return FALSE;
+        JSON_checker_result res = new_JSON_checker_result(FALSE, jc->pos, -1);
+        destroy(jc);
+        return res;
     }
     if (next_char < 0) {
-        return reject(jc);
+        JSON_checker_result res = new_JSON_checker_result(FALSE, jc->pos, next_char);
+        destroy(jc);
+        return res;
     }
     if (next_char >= 128) {
         next_class = C_ETC;
     } else {
         next_class = ascii_class[next_char];
         if (next_class <= __) {
-            return reject(jc);
+            JSON_checker_result res = new_JSON_checker_result(FALSE, jc->pos, next_char);
+            destroy(jc);
+            return res;
         }
     }
 /*
@@ -317,35 +334,45 @@ JSON_checker_char(JSON_checker jc, int next_char)
 /* empty } */
         case -9:
             if (!pop(jc, MODE_KEY)) {
-                return reject(jc);
+                JSON_checker_result res = new_JSON_checker_result(FALSE, jc->pos, next_char);
+                destroy(jc);
+                return res;
             }
             jc->state = OK;
             break;
 
 /* } */ case -8:
             if (!pop(jc, MODE_OBJECT)) {
-                return reject(jc);
+                JSON_checker_result res = new_JSON_checker_result(FALSE, jc->pos, next_char);
+                destroy(jc);
+                return res;
             }
             jc->state = OK;
             break;
 
 /* ] */ case -7:
             if (!pop(jc, MODE_ARRAY)) {
-                return reject(jc);
+                JSON_checker_result res = new_JSON_checker_result(FALSE, jc->pos, next_char);
+                destroy(jc);
+                return res;
             }
             jc->state = OK;
             break;
 
 /* { */ case -6:
             if (!push(jc, MODE_KEY)) {
-                return reject(jc);
+                JSON_checker_result res = new_JSON_checker_result(FALSE, jc->pos, next_char);
+                destroy(jc);
+                return res;
             }
             jc->state = OB;
             break;
 
 /* [ */ case -5:
             if (!push(jc, MODE_ARRAY)) {
-                return reject(jc);
+                JSON_checker_result res = new_JSON_checker_result(FALSE, jc->pos, next_char);
+                destroy(jc);
+                return res;
             }
             jc->state = AR;
             break;
@@ -360,7 +387,7 @@ JSON_checker_char(JSON_checker jc, int next_char)
                 jc->state = OK;
                 break;
             default:
-                return reject(jc);
+                return reject(jc, next_char);
             }
             break;
 
@@ -371,7 +398,9 @@ JSON_checker_char(JSON_checker jc, int next_char)
     A comma causes a flip from object mode to key mode.
 */
                 if (!pop(jc, MODE_OBJECT) || !push(jc, MODE_KEY)) {
-                    return reject(jc);
+                    JSON_checker_result res = new_JSON_checker_result(FALSE, jc->pos, next_char);
+                    destroy(jc);
+                    return res;
                 }
                 jc->state = KE;
                 break;
@@ -379,7 +408,7 @@ JSON_checker_char(JSON_checker jc, int next_char)
                 jc->state = VA;
                 break;
             default:
-                return reject(jc);
+                return reject(jc, next_char);
             }
             break;
 
@@ -388,7 +417,9 @@ JSON_checker_char(JSON_checker jc, int next_char)
     A colon causes a flip from key mode to object mode.
 */
             if (!pop(jc, MODE_KEY) || !push(jc, MODE_OBJECT)) {
-                return reject(jc);
+                JSON_checker_result res = new_JSON_checker_result(FALSE, jc->pos, next_char);
+                destroy(jc);
+                return res;
             }
             jc->state = VA;
             break;
@@ -396,14 +427,16 @@ JSON_checker_char(JSON_checker jc, int next_char)
     Bad action.
 */
         default:
-            return reject(jc);
+            return reject(jc, next_char);
         }
     }
-    return TRUE;
+    JSON_checker_result res = new_JSON_checker_result(TRUE, -1, -1);
+    jc->pos += 1;
+    return res;
 }
 
 
-int
+JSON_checker_result
 JSON_checker_done(JSON_checker jc)
 {
 /*
@@ -413,9 +446,12 @@ JSON_checker_done(JSON_checker jc)
     text was accepted.
 */
     if (jc->valid != GOOD) {
-        return FALSE;
+        JSON_checker_result res = new_JSON_checker_result(FALSE, jc->pos, -1);
+        destroy(jc);
+        return res;
     }
-    int result = jc->state == OK && pop(jc, MODE_DONE);
+    int isok = jc->state == OK && pop(jc, MODE_DONE);
+    JSON_checker_result res = new_JSON_checker_result(isok, jc->pos, -1);
     destroy(jc);
-    return result;
+    return res;
 }

@@ -23,13 +23,16 @@ int main(int argc, char* argv[]) {
         if (next_char <= 0) {
             break;
         }
-        if (!JSON_checker_char(jc, next_char)) {
-            fprintf(stderr, "JSON_checker_char: syntax error\n");
+        JSON_checker_result r = JSON_checker_char(jc, next_char);
+        if (!r.returncode) {
+            fprintf(stderr, "JSON_checker_char: syntax error: '%c' at pos %i\n", r.badchar, r.pos);
             exit(1);
         }
     }
-    if (!JSON_checker_done(jc)) {
-        fprintf(stderr, "JSON_checker_end: syntax error\n");
+    
+    JSON_checker_result r = JSON_checker_done(jc);
+    if (!r.returncode) {
+        fprintf(stderr, "JSON_checker_end: syntax error at pos %i\n", r.pos);
         exit(1);
     }
 }

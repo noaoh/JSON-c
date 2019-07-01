@@ -12,8 +12,15 @@ typedef struct JSON_checker_struct {
     int state;
     int depth;
     int top;
+    int pos;
     int* stack;
 } * JSON_checker;
+
+typedef struct JSON_checker_result {
+    int returncode;
+    int pos;
+    int badchar;
+} JSON_checker_result;
 
 
 extern JSON_checker new_JSON_checker(int depth);
@@ -24,14 +31,16 @@ extern JSON_checker new_JSON_checker(int depth);
     They will destroy the object for you.
 */
 
-extern int JSON_checker_char(JSON_checker jc, int next_char);
+extern JSON_checker_result new_JSON_checker_result(int returncode, int pos, int badchar);
+
+extern JSON_checker_result JSON_checker_char(JSON_checker jc, int next_char);
 
 /*
     You should call JSON_checker_char for each character of the JSON text.
     It will return false if the text is not right.
 */
 
-extern int JSON_checker_done(JSON_checker jc);
+extern JSON_checker_result JSON_checker_done(JSON_checker jc);
 
 /*
     When there are no more JSON text characters, call JSON_checker_done.
